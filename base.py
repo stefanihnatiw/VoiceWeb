@@ -31,12 +31,15 @@ def on_release(key):
 
 class Browser:
     def __init__(self):
-        options = self.set_options()
-        self.driver = webdriver.Chrome(options=options.get())
+        # options = self.set_options()
+        # self.driver = webdriver.Chrome(options=options.get())
+        self.driver = webdriver.Chrome()
         self.current_tab = 0
         self.scroll_base_speed = 5
         self.scroll_update_speed = 5
         self.scroll_speed = self.scroll_base_speed
+        self.button_map = dict()
+        self.input_map = dict()
 
     def set_options(self):
         print("Would you like to edit the settings?")
@@ -101,6 +104,11 @@ class Browser:
                     avg_value = button.text
                     break
             if avg_value is None:
+                for button in buttons:
+                    if value.lower() in button.text.lower():
+                        avg_value = button.text
+                        break
+            if avg_value is None:
                 raise Exception
             self.driver.find_element_by_link_text(avg_value).click()
             if len(self.driver.window_handles) != nr_tabs:
@@ -117,6 +125,11 @@ class Browser:
                 if similar(value, button.text) is True:
                     avg_value = button.text
                     break
+            if avg_value is None:
+                for button in buttons:
+                    if value.lower() in button.text.lower():
+                        avg_value = button.text
+                        break
             if avg_value is None:
                 raise Exception
             elem = self.driver.find_element_by_link_text(avg_value)
@@ -284,10 +297,37 @@ class Browser:
         keyboard.press(Key.enter)
         keyboard.release(Key.enter)
 
+    def cancel(self):
+        keyboard.press(Key.esc)
+        keyboard.release(Key.esc)
+
+    def find_button(self, value):
+        self.button_map = dict()
+        buttons = self.driver.find_elements_by_css_selector("button") + \
+                  self.driver.find_elements_by_css_selector("a")
+        for button in buttons:
+            if value.lower() in button.text.lower():
+                self.button_map[str(len(self.button_map.keys()) + 1)] = button
+
+        for index in self.button_map:
+            print(str(index) + ' - ' + self.button_map[index].text)
+        if len(self.button_map.keys()) == 0:
+            print("Couldn't find button " + value)
+
+    def choose_button(self, value):
+        if value in self.button_map:
+            nr_tabs = len(self.driver.window_handles)
+            self.button_map[value].click()
+            self.button_map = dict()
+            if len(self.driver.window_handles) != nr_tabs:
+                self.switch_tab()
+        else:
+            print("Button " + value + " is not mapped.")
+
 
 browser = Browser()
 
-#TODO function to find the button containing a specific string
+#TODO form completion
 #TODO map all clickables on page (and input fields)
 #TODO optiuni, taste de apasat
 
@@ -386,6 +426,17 @@ if __name__ == '__main__':
 
             elif similar("submit", voice.command):
                 browser.submit()
+
+            elif similar("cancel", voice.command):
+                browser.cancel()
+
+            elif similar("find the button", " ".join(voice.command.split()[:3])):
+                value = " ".join(voice.command.split()[3:])
+                browser.find_button(value)
+
+            elif similar("choose button number", " ".join(voice.command.split()[:3])):
+                value = " ".join(voice.command.split()[3:])
+                browser.choose_button(value)
 
             elif similar("exit", voice.command):
                 browser.quit()
