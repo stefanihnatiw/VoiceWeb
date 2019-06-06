@@ -5,7 +5,8 @@ from threading import Thread
 from pynput.keyboard import Key, Listener, Controller
 import time
 from voice import Voice
-from settings import Options
+# from settings import Options
+from selenium.webdriver.chrome.options import Options
 from ops import similar
 
 pressed = False
@@ -29,19 +30,29 @@ def on_release(key):
         return False
 
 
+numbers = {"one":"1", "two":"2", "three":"3", "four":"4", "five":"5", "six":"6", "seven":"7", "eight":"8", "nine":"9",
+                      "to":"2",  "tree":"3",  "for":"4"}
+
+keys = {"space":" "}
+
+
 class Browser:
     def __init__(self):
         # options = self.set_options()
         # self.driver = webdriver.Chrome(options=options.get())
-        self.driver = webdriver.Chrome()
+        options = Options()
+        options.add_extension(r'D:\Python\Google Translate.crx')
+        self.driver = webdriver.Chrome(options=options)
         self.current_tab = 0
         self.scroll_base_speed = 5
         self.scroll_update_speed = 5
         self.scroll_speed = self.scroll_base_speed
         self.button_map = dict()
         self.input_map = dict()
+        self.selected_field = None
+        self.caps_lock = False
 
-    def set_options(self):
+    '''def set_options(self):
         print("Would you like to edit the settings?")
         options = Options()
 
@@ -68,7 +79,7 @@ class Browser:
                     print("Browser will start maximized.")
                     options.add_arg("--start-maximized")
         options.set()
-        return options
+        return options'''
 
     def open(self, url):
         try:
@@ -76,10 +87,10 @@ class Browser:
         except:
             print("Couldn't open " + url)
 
-    def close(self):
+    '''def close(self):
         for tab in self.driver.window_handles:
             self.driver.switch_to.window(tab)
-            self.driver.close()
+            self.driver.close()'''
 
     def quit(self):
         self.driver.quit()
@@ -137,18 +148,6 @@ class Browser:
             action.perform()
         except:
             print("Couldn't hover over " + value)
-
-    def find_form_fields(self):
-        all_options = self.driver.find_elements_by_tag_name('input')
-        for option in all_options:
-            print(option.get_attribute('name'))
-
-    def fill_form_field(self, name, text, submit=False):
-        elem = self.driver.find_element_by_name(name)
-        elem.clear()
-        elem.send_keys(text)
-        if submit:
-            elem.submit()
 
     def page_down(self):
         time.sleep(.001)
@@ -311,10 +310,21 @@ class Browser:
 
         for index in self.button_map:
             print(str(index) + ' - ' + self.button_map[index].text)
+            self.driver.execute_script("arguments[0].setAttribute('style','color:white;background-color:red')",
+                                       self.button_map[index])
+            self.driver.execute_script('arguments[0].innerHTML = "{} {}";'.format(index, self.button_map[index].text),
+                                       self.button_map[index])
         if len(self.button_map.keys()) == 0:
             print("Couldn't find button " + value)
 
     def choose_button(self, value):
+        try:
+            convert = int(value)
+        except:
+            try:
+                value = numbers[value]
+            except:
+                pass
         if value in self.button_map:
             nr_tabs = len(self.driver.window_handles)
             self.button_map[value].click()
@@ -324,12 +334,80 @@ class Browser:
         else:
             print("Button " + value + " is not mapped.")
 
+    def find_input_fields(self):
+        self.input_map = dict()
+        fields = self.driver.find_elements_by_xpath('//input[not(@type="submit")]')
+        for field in fields:
+            self.input_map[str(len(self.input_map.keys()) + 1)] = field
+
+        for index in self.input_map:
+            print(str(index))
+            self.driver.execute_script("arguments[0].setAttribute('type','text')",
+                                       self.input_map[index])
+            self.driver.execute_script("arguments[0].setAttribute('style','color:white;background-color:red')",
+                                       self.input_map[index])
+            self.driver.execute_script("arguments[0].setAttribute('value','{}')".format(index),
+                                       self.input_map[index])
+
+    def select_input_field(self, value):
+        try:
+            convert = int(value)
+        except:
+            try:
+                value = numbers[value]
+            except:
+                pass
+        if value in self.input_map:
+            self.selected_field = self.input_map[value]
+        else:
+            print("Input " + value + " is not mapped.")
+
+    def type_text(self, text):
+        if self.caps_lock is True:
+            text = text.upper()
+        else:
+            text = text.lower()
+        fields = self.driver.find_elements_by_xpath('//input[not(@type="submit")]')
+        if self.selected_field in fields:
+            if text.lower() in keys:
+                self.selected_field.send_keys(keys[text.lower()])
+            else:
+                self.selected_field.send_keys(text.replace(' ', ''))
+
+    def clear_text(self, positions=None):
+        try:
+            positions = int(positions)
+        except:
+            try:
+                positions = int(numbers[positions])
+            except:
+                pass
+        fields = self.driver.find_elements_by_xpath('//input[not(@type="submit")]')
+        if self.selected_field in fields:
+            if positions is None:
+                self.selected_field.clear()
+            else:
+                while positions != 0:
+                    positions -= 1
+                    keyboard.press(Key.backspace)
+                    keyboard.release(Key.backspace)
+
+    def change_caps(self, setter):
+        if self.caps_lock is False and setter.lower() == "on":
+            self.caps_lock = True
+            keyboard.press(Key.caps_lock)
+            keyboard.release(Key.caps_lock)
+        elif self.caps_lock is True and setter.lower() == "off":
+            self.caps_lock = False
+            keyboard.press(Key.caps_lock)
+            keyboard.release(Key.caps_lock)
+
 
 browser = Browser()
 
 #TODO form completion
 #TODO map all clickables on page (and input fields)
-#TODO optiuni, taste de apasat
+#TODO fix translate
 
 
 if __name__ == '__main__':
@@ -438,6 +516,28 @@ if __name__ == '__main__':
                 value = " ".join(voice.command.split()[3:])
                 browser.choose_button(value)
 
-            elif similar("exit", voice.command):
+            elif similar("find input fields", voice.command):
+                browser.find_input_fields()
+
+            elif similar("select input field", " ".join(voice.command.split()[:3])):
+                value = voice.command.split()[3]
+                browser.select_input_field(value)
+
+            elif similar("type text", " ".join(voice.command.split()[:2])):
+                text = " ".join(voice.command.split()[2:])
+                browser.type_text(text)
+
+            elif similar("clear", voice.command.split()[0]):
+                try:
+                    positions = voice.command.split()[1]
+                    browser.clear_text(positions)
+                except:
+                    browser.clear_text()
+
+            elif similar("caps", voice.command.split()[0]):
+                setter = voice.command.split()[1]
+                browser.change_caps(setter)
+
+            elif voice.command == "exit":
                 browser.quit()
                 break
