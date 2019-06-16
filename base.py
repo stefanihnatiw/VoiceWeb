@@ -40,9 +40,9 @@ class Browser:
     def __init__(self):
         # options = self.set_options()
         # self.driver = webdriver.Chrome(options=options.get())
-        options = Options()
-        options.add_extension(r'D:\Python\Google Translate.crx')
-        self.driver = webdriver.Chrome(options=options)
+        # options = Options()
+        # options.add_extension(r'D:\Python\Google Translate.crx')
+        self.driver = webdriver.Chrome()
         self.current_tab = 0
         self.scroll_base_speed = 5
         self.scroll_update_speed = 5
@@ -150,14 +150,12 @@ class Browser:
             print("Couldn't hover over " + value)
 
     def page_down(self):
-        time.sleep(.001)
-        action = ActionChains(self.driver).send_keys(Keys.PAGE_DOWN)
-        action.perform()
+        keyboard.press(Key.page_down)
+        keyboard.release(Key.page_down)
 
     def page_up(self):
-        time.sleep(.001)
-        action = ActionChains(self.driver).send_keys(Keys.PAGE_UP)
-        action.perform()
+        keyboard.press(Key.page_up)
+        keyboard.release(Key.page_up)
 
     def scroll_down(self):
         last_height = self.driver.execute_script("return document.body.scrollHeight")
@@ -310,10 +308,13 @@ class Browser:
 
         for index in self.button_map:
             print(str(index) + ' - ' + self.button_map[index].text)
-            self.driver.execute_script("arguments[0].setAttribute('style','color:white;background-color:red')",
-                                       self.button_map[index])
-            self.driver.execute_script('arguments[0].innerHTML = "{} {}";'.format(index, self.button_map[index].text),
-                                       self.button_map[index])
+            try:
+                self.driver.execute_script("arguments[0].setAttribute('style','color:white;background-color:red')",
+                                           self.button_map[index])
+                self.driver.execute_script('arguments[0].innerHTML = "{} {}";'.format(index, self.button_map[index].text),
+                                           self.button_map[index])
+            except:
+                pass
         if len(self.button_map.keys()) == 0:
             print("Couldn't find button " + value)
 
@@ -527,14 +528,17 @@ if __name__ == '__main__':
                 text = " ".join(voice.command.split()[2:])
                 browser.type_text(text)
 
-            elif similar("clear", voice.command.split()[0]):
+            elif len(voice.command.split()) == 1 and voice.command.split()[0] == "clear":
                 try:
                     positions = voice.command.split()[1]
                     browser.clear_text(positions)
                 except:
-                    browser.clear_text()
+                    try:
+                        browser.clear_text()
+                    except:
+                        pass
 
-            elif similar("caps", voice.command.split()[0]):
+            elif len(voice.command.split()) == 2 and voice.command.split()[0] == "caps":
                 setter = voice.command.split()[1]
                 browser.change_caps(setter)
 
