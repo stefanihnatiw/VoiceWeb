@@ -378,6 +378,7 @@ class Browser:
                 pass
         if value in self.input_map:
             self.selected_field = self.input_map[value]
+            self.selected_field.clear()
         else:
             print("Input " + value + " is not mapped.")
 
@@ -511,8 +512,7 @@ class Browser:
                                                elem)
                     return
             print("Text couldn't be found.")
-        except Exception as e:
-            print(e)
+        except:
             print("Text couldn't be found.")
 
     def paste(self):
@@ -554,6 +554,7 @@ browser = Browser()
 
 
 def start():
+    browser.open('google.com')
     while True:
         listener = Listener(on_press=on_press, on_release=on_release)
         listener.start()
