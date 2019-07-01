@@ -84,6 +84,7 @@ class Browser:
         self.image_map = dict()
         self.selected_field = None
         self.caps_lock = False
+        self.copied_text = None
 
     def open(self, url):
         try:
@@ -107,7 +108,8 @@ class Browser:
         try:
             nr_tabs = len(self.driver.window_handles)
             buttons = self.driver.find_elements_by_css_selector("button") + \
-                      self.driver.find_elements_by_css_selector("a")
+                      self.driver.find_elements_by_css_selector("a") + \
+                      self.driver.find_elements_by_xpath('//input[@type="submit"]')
             avg_value = None
             for button in buttons:
                 if similar(value, button.text) is True:
@@ -129,7 +131,8 @@ class Browser:
     def hover(self, value):
         try:
             buttons = self.driver.find_elements_by_css_selector("button") + \
-                      self.driver.find_elements_by_css_selector("a")
+                      self.driver.find_elements_by_css_selector("a") + \
+                      self.driver.find_elements_by_xpath('//input[@type="submit"]')
             avg_value = None
             for button in buttons:
                 if similar(value, button.text) is True:
@@ -235,10 +238,16 @@ class Browser:
         self.driver.refresh()
 
     def back(self):
-        self.driver.execute_script("window.history.go(-1)")
+        try:
+            self.driver.execute_script("window.history.go(-1)")
+        except:
+            print("Couldn't perform the operation.")
 
     def forward(self):
-        self.driver.execute_script("window.history.go(1)")
+        try:
+            self.driver.execute_script("window.history.go(1)")
+        except:
+            print("Couldn't perform the operation.")
 
     def bookmark(self):
         with keyboard.pressed(Key.ctrl):
@@ -268,7 +277,7 @@ class Browser:
         with keyboard.pressed(Key.ctrl):
             keyboard.press('u')
             keyboard.release('u')
-        time.sleep(0.01)
+        time.sleep(0.1)
         self.switch_tab()
 
     def submit(self):
@@ -282,21 +291,25 @@ class Browser:
     def find_button(self, value=''):
         self.button_map = dict()
         buttons = self.driver.find_elements_by_css_selector("button") + \
-                  self.driver.find_elements_by_css_selector("a")
+                  self.driver.find_elements_by_css_selector("a") + \
+                  self.driver.find_elements_by_xpath('//input[@type="submit"]')
         for button in buttons:
-            if value.lower() in button.text.lower():
+            if value == '' or value.lower() in button.text.lower():
                 self.button_map[str(len(self.button_map.keys()) + 1)] = button
 
         for index in self.button_map:
             print(str(index) + ' - ' + self.button_map[index].text)
             try:
-                self.driver.execute_script('''
-                                           var node = document.createElement("div");
-                                           var textnode = document.createTextNode("{}");
-                                           node.appendChild(textnode);
-                                           node.setAttribute('style', 'position:relative;left:10px;display:table-cell;border-radius:20px;font-size:1.5em;background-color:red;color:white');
-                                           arguments[0].appendChild(node);
-                                           '''.format(index), self.button_map[index])
+                script = '''
+                         var node = document.createElement("div");
+                         var textnode = document.createTextNode("{}");
+                         node.appendChild(textnode);
+                         node.setAttribute('style', 'position:relative;left:10px;display:table-cell;border-radius:20px;font-size:1.5em;background-color:red;color:white');
+                         '''.format(index)
+                if self.button_map[index].tag_name == 'input':
+                    self.driver.execute_script(script + 'arguments[0].parentNode.appendChild(node);', self.button_map[index])
+                else:
+                    self.driver.execute_script(script + 'arguments[0].appendChild(node);', self.button_map[index])
             except Exception as e:
                 print(e)
                 pass
@@ -445,9 +458,28 @@ class Browser:
             keyboard.release(Key.caps_lock)
 
     def translate(self):
+        with keyboard.pressed(Key.ctrl):
+            keyboard.press('q')
+            keyboard.release('q')
+        time.sleep(0.1)
+        keyboard.press(Key.tab)
+        keyboard.release(Key.tab)
+        keyboard.press(Key.tab)
+        keyboard.release(Key.tab)
+        keyboard.press(Key.enter)
+        keyboard.release(Key.enter)
+        '''
         url = "translate.google.com/translate?hl=en&sl=auto&tl=en&u=" + \
               urllib.parse.quote(self.driver.current_url, safe='')
         self.open(url)
+        time.sleep(3)
+        self.driver.switch_to.default_content()
+        iframe = self.driver.find_element_by_tag_name('iframe')
+        self.driver.execute_script("arguments[0].setAttribute('id','iframe_id')",
+                                   iframe)
+        self.driver.switch_to.frame('iframe_id')
+        print(self.driver.find_element_by_xpath("//div").get_attribute('id'))
+        '''
 
     def look_for(self, text):
         with keyboard.pressed(Key.ctrl):
@@ -474,12 +506,48 @@ class Browser:
             elems = self.driver.find_elements_by_css_selector("*")
             for elem in elems:
                 if text.lower() in elem.text.lower() and len(elem.find_elements_by_css_selector(":not(a):not(b):not(i)")) == 0:
-                    print(elem.text)
+                    self.copied_text = elem.text
+                    self.driver.execute_script("arguments[0].setAttribute('style','color:white;background-color:red')",
+                                               elem)
                     return
             print("Text couldn't be found.")
         except Exception as e:
             print(e)
             print("Text couldn't be found.")
+
+    def paste(self):
+        fields = self.driver.find_elements_by_xpath('//input[not(@type="submit")]')
+        if self.selected_field in fields and self.copied_text is not None:
+            self.selected_field.send_keys(self.copied_text)
+
+    def view_bookmarks(self):
+        with keyboard.pressed(Key.ctrl):
+            with keyboard.pressed(Key.shift):
+                keyboard.press('o')
+                keyboard.release('o')
+        time.sleep(0.01)
+        self.switch_tab()
+
+    def select_bookmark(self, value):
+
+        def get_shadow(element):
+            return self.driver.execute_script('return arguments[0].shadowRoot', element)
+
+        try:
+            bookmarks_app = self.driver.find_element_by_css_selector("bookmarks-app")
+            shadow_root = get_shadow(bookmarks_app)
+            bookmarks_list = shadow_root.find_element_by_css_selector("div bookmarks-list")
+            shadow_root = get_shadow(bookmarks_list)
+            bookmarks = shadow_root.find_elements_by_css_selector("iron-list bookmarks-item")
+            for bookmark in bookmarks:
+                shadow_root = get_shadow(bookmark)
+                title = shadow_root.find_element_by_css_selector("#website-title").get_attribute('title')
+                url = shadow_root.find_element_by_css_selector("#website-url").get_attribute('title')
+                if value.lower() in title.lower():
+                    self.driver.get(url)
+                    return
+        except:
+            print("Couldn't find the specified bookmark.")
 
 
 browser = Browser()
@@ -621,6 +689,16 @@ def start():
             elif similar("select text", " ".join(voice.command.split()[:2])):
                 text = " ".join(voice.command.split()[2:])
                 browser.select_text(text)
+
+            elif similar("paste text", voice.command):
+                browser.paste()
+
+            elif similar("view bookmarks", voice.command):
+                browser.view_bookmarks()
+
+            elif similar("select bookmark", " ".join(voice.command.split()[:2])):
+                value = " ".join(voice.command.split()[2:])
+                browser.select_bookmark(value)
 
             elif voice.command == "exit":
                 browser.quit()
