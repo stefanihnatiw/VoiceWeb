@@ -289,6 +289,9 @@ class Browser:
         keyboard.release(Key.esc)
 
     def find_button(self, value=''):
+        nodes = self.driver.find_elements_by_name('addedNode')
+        for node in nodes:
+            self.driver.execute_script('arguments[0].parentNode.removeChild(arguments[0]);', node)
         self.button_map = dict()
         buttons = self.driver.find_elements_by_css_selector("button") + \
                   self.driver.find_elements_by_css_selector("a") + \
@@ -305,6 +308,7 @@ class Browser:
                          var textnode = document.createTextNode("{}");
                          node.appendChild(textnode);
                          node.setAttribute('style', 'position:relative;left:10px;display:table-cell;border-radius:20px;font-size:1.5em;background-color:red;color:white');
+                         node.setAttribute('name', 'addedNode');
                          '''.format(index)
                 if self.button_map[index].tag_name == 'input':
                     self.driver.execute_script(script + 'arguments[0].parentNode.appendChild(node);', self.button_map[index])
@@ -382,6 +386,15 @@ class Browser:
         else:
             print("Input " + value + " is not mapped.")
 
+    def input_text(self, text):
+        if text in keys:
+            keyboard.press(keys[text])
+            keyboard.release(keys[text])
+        else:
+            for char in text:
+                keyboard.press(char)
+                keyboard.release(char)
+
     def type_text(self, text):
         if self.caps_lock is True:
             text = text.upper()
@@ -392,7 +405,7 @@ class Browser:
             if text.lower() in keys:
                 self.selected_field.send_keys(keys[text.lower()])
             else:
-                self.selected_field.send_keys(text.replace(' ', ''))
+                self.selected_field.send_keys(text)
 
     def clear_text(self, positions=None):
         try:
@@ -413,6 +426,9 @@ class Browser:
                     keyboard.release(Key.backspace)
 
     def find_images(self):
+        nodes = self.driver.find_elements_by_name('addedNode')
+        for node in nodes:
+            self.driver.execute_script('arguments[0].parentNode.removeChild(arguments[0]);', node)
         self.image_map = dict()
         images = self.driver.find_elements_by_css_selector("img")
         for image in images:
@@ -425,6 +441,7 @@ class Browser:
                                        var textnode = document.createTextNode("{}");
                                        node.appendChild(textnode);
                                        node.setAttribute('style', 'position:relative;left:10px;display:table-cell;border-radius:20px;font-size:1.5em;background-color:red;color:white');
+                                       node.setAttribute('name', 'addedNode');
                                        arguments[0].parentNode.appendChild(node);
                                        '''.format(index), self.image_map[index])
 
@@ -462,7 +479,21 @@ class Browser:
         with keyboard.pressed(Key.ctrl):
             keyboard.press('q')
             keyboard.release('q')
+        time.sleep(0.3)
+        keyboard.press(Key.tab)
+        keyboard.release(Key.tab)
+        keyboard.press(Key.tab)
+        keyboard.release(Key.tab)
+        keyboard.press(Key.enter)
+        keyboard.release(Key.enter)
         time.sleep(0.1)
+        keyboard.press(Key.esc)
+        keyboard.release(Key.esc)
+        time.sleep(0.1)
+        with keyboard.pressed(Key.ctrl):
+            keyboard.press('q')
+            keyboard.release('q')
+        time.sleep(0.3)
         keyboard.press(Key.tab)
         keyboard.release(Key.tab)
         keyboard.press(Key.tab)
@@ -525,7 +556,7 @@ class Browser:
             with keyboard.pressed(Key.shift):
                 keyboard.press('o')
                 keyboard.release('o')
-        time.sleep(0.01)
+        time.sleep(0.1)
         self.switch_tab()
 
     def select_bookmark(self, value):
@@ -648,6 +679,10 @@ def start():
             elif similar("select input field", " ".join(voice.command.split()[:3])):
                 value = voice.command.split()[3]
                 browser.select_input_field(value)
+
+            elif similar("input text", " ".join(voice.command.split()[:2])):
+                text = " ".join(voice.command.split()[2:])
+                browser.input_text(text)
 
             elif similar("type text", " ".join(voice.command.split()[:2])):
                 text = " ".join(voice.command.split()[2:])
